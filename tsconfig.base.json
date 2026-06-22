@@ -17,7 +17,9 @@
       "@commerical-cinema/core": ["./packages/core/src/index.ts"],
       "@commerical-cinema/core/*": ["./packages/core/src/*"],
       "@commerical-cinema/event-bus": ["./packages/event-bus/src/index.ts"],
-      "@commerical-cinema/event-bus/*": ["./packages/event-bus/src/*"]
+      "@commerical-cinema/event-bus/*": ["./packages/event-bus/src/*"],
+      "@commerical-cinema/rpc": ["./packages/rpc/src/index.ts"],
+      "@commerical-cinema/rpc/*": ["./packages/rpc/src/*"]
     }
   }
 }

@@ -8,6 +8,7 @@ export * from "./inventory-sql";
 export * from "./analytics";
 export * from "./cart";
 export * from "./auth";
+export * from "./seed-data";
 
 import { users } from "./users";
 import { orders, orderItems } from "./orders";

@@ -1,0 +1,37 @@
+syntax = "proto3";
+
+package stock;
+
+// Internal contract between the Menu Service (read path) and the Stock Service.
+// Stock counts are small integers, so gRPC unary calls stay well within HTTP/2
+// default flow-control windows under Bun's node:http2 implementation.
+service StockService {
+  // Read live availability for a batch of catalog items (Menu read path).
+  rpc GetStock(GetStockRequest) returns (GetStockResponse);
+  // Atomically reserve stock for a single item (Order write path).
+  rpc Decrement(DecrementRequest) returns (DecrementResponse);
+}
+
+message GetStockRequest {
+  repeated string item_ids = 1;
+}
+
+message StockLevel {
+  string item_id = 1;
+  int32 available = 2;
+}
+
+message GetStockResponse {
+  repeated StockLevel levels = 1;
+}
+
+message DecrementRequest {
+  string item_id = 1;
+  int32 quantity = 2;
+}
+
+// code: 1 = success, 0 = insufficient stock, -1 = item not found.
+message DecrementResponse {
+  int32 code = 1;
+  int32 remaining = 2;
+}

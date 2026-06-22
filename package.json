@@ -9,13 +9,17 @@
     "dev:gateway": "bun run --filter @commerical-cinema/gateway dev",
     "dev:user": "bun run --filter @commerical-cinema/user-service dev",
     "dev:cart": "bun run --filter @commerical-cinema/cart-service dev",
+    "dev:menu": "bun run --filter @commerical-cinema/menu-service dev",
+    "dev:stock": "bun run --filter @commerical-cinema/stock-service dev",
     "dev:web": "bun run --filter @commerical-cinema/web dev",
     "db:up": "docker compose -f docker/docker-compose.yml up -d",
     "db:down": "docker compose -f docker/docker-compose.yml down",
     "db:generate": "bun run --filter @commerical-cinema/schema db:generate",
     "db:migrate": "bun run --filter @commerical-cinema/schema db:migrate",
+    "db:seed": "bun run --filter @commerical-cinema/schema db:seed",
+    "seed:redis": "bun run --filter @commerical-cinema/stock-service seed:redis",
     "typecheck": "bun run --filter '*' typecheck",
-    "test": "bun run --filter @commerical-cinema/cart-service test",
+    "test": "bun run --filter @commerical-cinema/cart-service test && bun run --filter @commerical-cinema/stock-service test",
     "prepare": "husky"
   },
   "devDependencies": {
