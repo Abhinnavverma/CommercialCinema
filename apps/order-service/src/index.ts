@@ -1,8 +1,8 @@
 import Fastify from "fastify";
 import { registerJwt } from "@commerical-cinema/core";
 import { createDb } from "@commerical-cinema/schema";
-import { EVENTS, QUEUES, createNamedQueue } from "@commerical-cinema/event-bus";
-import type { OrderPlacedEvent } from "@commerical-cinema/event-bus";
+import { EVENTS, QUEUES, createNamedQueue, createQueue } from "@commerical-cinema/event-bus";
+import type { OrderPlacedEvent, OrderStatusUpdatedEvent } from "@commerical-cinema/event-bus";
 import { createStockClient } from "@commerical-cinema/rpc";
 import { OrderService } from "./services/order-service.js";
 import { createOrderController } from "./controllers/order-controller.js";
@@ -25,6 +25,7 @@ const db = createDb(databaseUrl);
 const stockClient = createStockClient(stockGrpcUrl);
 const cartCleanupQueue = createNamedQueue<OrderPlacedEvent>(QUEUES.CART_CLEANUP, redisUrl);
 const analyticsQueue = createNamedQueue<OrderPlacedEvent>(QUEUES.ANALYTICS, redisUrl);
+const notificationQueue = createQueue(EVENTS.ORDER_STATUS_UPDATED, redisUrl);
 
 const orderService = new OrderService(db);
 
@@ -35,6 +36,7 @@ const orderController = createOrderController({
   stockClient,
   cartCleanupQueue,
   analyticsQueue,
+  notificationQueue,
   charge: chargePayment,
   log: (message, error) => app.log.error({ err: error }, message),
 });
@@ -45,6 +47,7 @@ app.get("/health", async () => ({ status: "ok", service: "order-service" }));
 app.addHook("onClose", async () => {
   await cartCleanupQueue.close();
   await analyticsQueue.close();
+  await notificationQueue.close();
   stockClient.close();
 });
 

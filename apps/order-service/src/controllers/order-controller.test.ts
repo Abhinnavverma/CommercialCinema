@@ -3,7 +3,7 @@ import type { FastifyReply, FastifyRequest } from "fastify";
 import type { CartItem, Order, OrderItem } from "@commerical-cinema/schema";
 import { HTTP_STATUS } from "@commerical-cinema/core";
 import { EVENTS } from "@commerical-cinema/event-bus";
-import type { OrderPlacedEvent } from "@commerical-cinema/event-bus";
+import type { OrderPlacedEvent, OrderStatusUpdatedEvent } from "@commerical-cinema/event-bus";
 import type { Queue } from "@commerical-cinema/event-bus";
 import type { StockClient } from "@commerical-cinema/rpc";
 import { createOrderController } from "./order-controller.js";
@@ -56,9 +56,9 @@ function fakeReply(captured: CapturedReply): FastifyReply {
   return reply as unknown as FastifyReply;
 }
 
-function fakeRequest(body?: unknown, params?: unknown): FastifyRequest {
+function fakeRequest(body?: unknown, params?: unknown, role: "patron" | "admin" = "patron"): FastifyRequest {
   return {
-    user: { sub: userId, role: "patron" as const, ageGroup },
+    user: { sub: role === "admin" ? "admin" : userId, role, ageGroup },
     body,
     params,
   } as unknown as FastifyRequest;
@@ -69,6 +69,7 @@ type SetupOptions = {
   insufficientFor?: string;
   listResult?: Order[];
   orderRecord?: OrderWithItems | null;
+  orderById?: Order | null;
 };
 
 const noopCharge: PaymentGateway = async () => ({ success: true, paymentRef: "pay_noop" });
@@ -78,7 +79,8 @@ function setup(options: SetupOptions = {}) {
   const releaseCalls: { itemId: string; quantity: number }[] = [];
   const createOrderCalls: CreateOrderInput[] = [];
   const cancelCalls: { userId: string; orderId: string }[] = [];
-  const publishedEvents: { name: string; data: OrderPlacedEvent }[] = [];
+  const publishedEvents: { name: string; data: OrderPlacedEvent | OrderStatusUpdatedEvent }[] = [];
+  const statusUpdateCalls: { orderId: string; expected: Order["status"]; next: Order["status"] }[] = [];
 
   const stockClient = {
     async decrement(request: { itemId: string; quantity: number }) {
@@ -130,9 +132,36 @@ function setup(options: SetupOptions = {}) {
       }
       return { ...record.order, status: ORDER_STATUS_CANCELLED };
     },
+    async getOrderById(orderId: string): Promise<Order | null> {
+      if (options.orderById !== undefined) {
+        return options.orderById;
+      }
+      const record = options.orderRecord;
+      if (!record || record.order.id !== orderId) {
+        return null;
+      }
+      return record.order;
+    },
+    async updateOrderStatus(
+      orderId: string,
+      expectedStatus: Order["status"],
+      newStatus: Order["status"],
+    ): Promise<Order | null> {
+      statusUpdateCalls.push({ orderId, expected: expectedStatus, next: newStatus });
+      const record = options.orderRecord ?? (options.orderById ? { order: options.orderById, items: [] } : null);
+      if (!record || record.order.id !== orderId || record.order.status !== expectedStatus) {
+        return null;
+      }
+      return { ...record.order, status: newStatus };
+    },
   } satisfies Pick<
     OrderService,
-    "createOrder" | "listOrders" | "getOrderWithItems" | "cancelOrderIfEligible"
+    | "createOrder"
+    | "listOrders"
+    | "getOrderWithItems"
+    | "cancelOrderIfEligible"
+    | "getOrderById"
+    | "updateOrderStatus"
   >;
 
   const cartCleanupQueue = {
@@ -149,16 +178,32 @@ function setup(options: SetupOptions = {}) {
     },
   } as unknown as Pick<Queue<OrderPlacedEvent>, "add">;
 
+  const notificationQueue = {
+    async add(name: string, data: OrderStatusUpdatedEvent) {
+      publishedEvents.push({ name, data });
+      return undefined as unknown as Awaited<ReturnType<Queue<OrderStatusUpdatedEvent>["add"]>>;
+    },
+  } as unknown as Pick<Queue<OrderStatusUpdatedEvent>, "add">;
+
   const controller = createOrderController({
     orderService,
     stockClient,
     cartCleanupQueue,
     analyticsQueue,
+    notificationQueue,
     charge: options.charge ?? noopCharge,
     log: () => {},
   });
 
-  return { controller, decrementCalls, releaseCalls, createOrderCalls, cancelCalls, publishedEvents };
+  return {
+    controller,
+    decrementCalls,
+    releaseCalls,
+    createOrderCalls,
+    cancelCalls,
+    publishedEvents,
+    statusUpdateCalls,
+  };
 }
 
 const approve: PaymentGateway = async () => ({ success: true, paymentRef: "pay_test_123" });
@@ -415,5 +460,75 @@ describe("OrderController.cancelOrder", () => {
     await controller.cancelOrder(fakeRequest({}), fakeReply(captured));
 
     expect(captured.statusCode).toBe(HTTP_STATUS.BAD_REQUEST);
+  });
+});
+
+describe("OrderController.updateOrderStatus", () => {
+  test("transitions placed -> preparing and publishes OrderStatusUpdated", async () => {
+    const { controller, publishedEvents, statusUpdateCalls } = setup({
+      orderById: makeOrder({ status: "placed" }),
+      orderRecord: makeRecord({ status: "placed" }),
+    });
+    const captured: CapturedReply = {};
+
+    await controller.updateOrderStatus(
+      fakeRequest({ status: "preparing" }, { id: "order-1" }, "admin"),
+      fakeReply(captured),
+    );
+
+    expect(statusUpdateCalls).toEqual([
+      { orderId: "order-1", expected: "placed", next: "preparing" },
+    ]);
+    expect(publishedEvents).toHaveLength(1);
+    expect(publishedEvents[0]?.name).toBe(EVENTS.ORDER_STATUS_UPDATED);
+    expect(publishedEvents[0]?.data).toEqual({
+      orderId: "order-1",
+      userId,
+      status: "preparing",
+    });
+    expect(captured.statusCode).toBe(HTTP_STATUS.OK);
+    expect(captured.payload).toEqual({ orderId: "order-1", status: "preparing" });
+  });
+
+  test("returns 400 for an invalid status transition", async () => {
+    const { controller, publishedEvents } = setup({
+      orderById: makeOrder({ status: "placed" }),
+    });
+    const captured: CapturedReply = {};
+
+    await controller.updateOrderStatus(
+      fakeRequest({ status: "ready" }, { id: "order-1" }, "admin"),
+      fakeReply(captured),
+    );
+
+    expect(captured.statusCode).toBe(HTTP_STATUS.BAD_REQUEST);
+    expect(publishedEvents).toHaveLength(0);
+  });
+
+  test("returns 404 when the order does not exist", async () => {
+    const { controller } = setup({ orderById: null });
+    const captured: CapturedReply = {};
+
+    await controller.updateOrderStatus(
+      fakeRequest({ status: "preparing" }, { id: "missing" }, "admin"),
+      fakeReply(captured),
+    );
+
+    expect(captured.statusCode).toBe(HTTP_STATUS.NOT_FOUND);
+  });
+
+  test("returns 409 when the conditional update loses a race", async () => {
+    const { controller } = setup({
+      orderById: makeOrder({ status: "placed" }),
+      orderRecord: makeRecord({ status: "preparing" }),
+    });
+    const captured: CapturedReply = {};
+
+    await controller.updateOrderStatus(
+      fakeRequest({ status: "preparing" }, { id: "order-1" }, "admin"),
+      fakeReply(captured),
+    );
+
+    expect(captured.statusCode).toBe(HTTP_STATUS.CONFLICT);
   });
 });

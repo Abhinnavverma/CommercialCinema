@@ -10,4 +10,7 @@ export const ERROR_MESSAGES = {
   ORDER_ID_REQUIRED: "orderId is required",
   ORDER_NOT_FOUND: "Order not found",
   ORDER_NOT_CANCELLABLE: "Order can no longer be cancelled",
+  INVALID_ORDER_STATUS: "Invalid order status",
+  INVALID_STATUS_TRANSITION: "Invalid status transition",
+  STATUS_CONFLICT: "Order status was updated concurrently",
 } as const;

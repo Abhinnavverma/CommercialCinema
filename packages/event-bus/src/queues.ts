@@ -16,6 +16,8 @@ export function createWorker<TName extends EventName>(
 ) {
   return new Worker<EventPayloads[TName]>(name, processor, {
     connection: createBusConnection(redisUrl),
+    // Minimal drain delay keeps notification fan-out within the bounded-sync-lag budget.
+    drainDelay: 1,
   });
 }
 

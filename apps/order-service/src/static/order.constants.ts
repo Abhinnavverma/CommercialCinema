@@ -9,6 +9,11 @@ export const PAYMENT_SUCCESS_RATE = 0.85;
 // Persisted order status once payment has cleared (mirrors the orderStatusEnum).
 export const ORDER_STATUS_PLACED = "placed";
 
+// Admin-driven fulfillment progression (mirrors the orderStatusEnum).
+export const ORDER_STATUS_PREPARING = "preparing";
+export const ORDER_STATUS_READY = "ready";
+export const ORDER_STATUS_SEAT_DELIVERED = "seat-delivered";
+
 // Terminal status after a patron cancels an order (mirrors the orderStatusEnum).
 export const ORDER_STATUS_CANCELLED = "cancelled";
 
@@ -16,6 +21,16 @@ export const ORDER_STATUS_CANCELLED = "cancelled";
 // it is 'preparing'/'ready'/'seat-delivered' the stock is physically committed and a
 // release would oversell. ('pending' in the spec maps to 'payment_pending'.)
 export const CANCELLABLE_STATUSES = ["payment_pending", "placed"] as const;
+
+// Linear forward transitions enforced by the admin status endpoint.
+export const ADMIN_STATUS_TRANSITIONS = {
+  [ORDER_STATUS_PLACED]: ORDER_STATUS_PREPARING,
+  [ORDER_STATUS_PREPARING]: ORDER_STATUS_READY,
+  [ORDER_STATUS_READY]: ORDER_STATUS_SEAT_DELIVERED,
+} as const;
+
+export type AdminTransitionFrom = keyof typeof ADMIN_STATUS_TRANSITIONS;
+export type AdminTransitionTo = (typeof ADMIN_STATUS_TRANSITIONS)[AdminTransitionFrom];
 
 // Mirrors the decrement-stock.lua return codes consumed during reservation.
 export const STOCK_DECREMENT_RESULT = {

@@ -1,9 +1,11 @@
 import Fastify, { type FastifyReply, type FastifyRequest } from "fastify";
-import { registerJwt } from "@commerical-cinema/core";
+import websocket from "@fastify/websocket";
+import { registerJwt, ROLES } from "@commerical-cinema/core";
 import {
   DEFAULT_CART_SERVICE_URL,
   DEFAULT_GATEWAY_PORT,
   DEFAULT_MENU_SERVICE_URL,
+  DEFAULT_NOTIFICATION_SERVICE_WS_URL,
   DEFAULT_ORDER_SERVICE_URL,
   DEFAULT_USER_SERVICE_URL,
 } from "./static/config.constants.js";
@@ -13,6 +15,8 @@ const userServiceUrl = process.env.USER_SERVICE_URL ?? DEFAULT_USER_SERVICE_URL;
 const cartServiceUrl = process.env.CART_SERVICE_URL ?? DEFAULT_CART_SERVICE_URL;
 const menuServiceUrl = process.env.MENU_SERVICE_URL ?? DEFAULT_MENU_SERVICE_URL;
 const orderServiceUrl = process.env.ORDER_SERVICE_URL ?? DEFAULT_ORDER_SERVICE_URL;
+const notificationServiceWsUrl =
+  process.env.NOTIFICATION_SERVICE_WS_URL ?? DEFAULT_NOTIFICATION_SERVICE_WS_URL;
 
 const app = Fastify({ logger: true });
 
@@ -47,6 +51,7 @@ async function forward(request: FastifyRequest, reply: FastifyReply, upstream: s
 }
 
 await registerJwt(app);
+await app.register(websocket);
 
 // Public auth surface -> User Service.
 app.all("/auth/*", (request, reply) => forward(request, reply, userServiceUrl));
@@ -54,6 +59,34 @@ app.all("/auth/*", (request, reply) => forward(request, reply, userServiceUrl));
 // Public menu browsing -> Menu Service (read path, no auth required).
 app.get("/menu", (request, reply) => forward(request, reply, menuServiceUrl));
 app.get("/menu/:id", (request, reply) => forward(request, reply, menuServiceUrl));
+
+const adminGuard = { preHandler: [app.authenticate, app.requireRole(ROLES.ADMIN)] };
+app.put("/orders/:id/status", adminGuard, (request, reply) => forward(request, reply, orderServiceUrl));
+
+// Patrons connect here; the gateway proxies server-push frames from the Notification Service.
+app.get("/ws", { websocket: true }, (clientSocket) => {
+  const upstream = new WebSocket(notificationServiceWsUrl);
+
+  upstream.addEventListener("message", (event) => {
+    if (clientSocket.readyState === clientSocket.OPEN) {
+      clientSocket.send(typeof event.data === "string" ? event.data : String(event.data));
+    }
+  });
+
+  const closeBoth = () => {
+    if (clientSocket.readyState === clientSocket.OPEN || clientSocket.readyState === clientSocket.CONNECTING) {
+      clientSocket.close();
+    }
+    if (upstream.readyState === WebSocket.OPEN || upstream.readyState === WebSocket.CONNECTING) {
+      upstream.close();
+    }
+  };
+
+  clientSocket.on("close", closeBoth);
+  upstream.addEventListener("close", closeBoth);
+  upstream.addEventListener("error", closeBoth);
+  clientSocket.on("error", closeBoth);
+});
 
 // Cart surface is patron-only; reject unauthenticated requests at the edge.
 const patronGuard = { preHandler: [app.authenticate] };

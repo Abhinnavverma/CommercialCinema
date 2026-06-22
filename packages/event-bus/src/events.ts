@@ -1,6 +1,7 @@
 export const EVENTS = {
   ORDER_PLACED: "OrderPlaced",
   ITEM_ZERO_STOCK: "ItemZeroStock",
+  ORDER_STATUS_UPDATED: "OrderStatusUpdated",
 } as const;
 
 export type EventName = (typeof EVENTS)[keyof typeof EVENTS];
@@ -19,7 +20,14 @@ export type ItemZeroStockEvent = {
   catalogItemId: string;
 };
 
+export type OrderStatusUpdatedEvent = {
+  orderId: string;
+  userId: string;
+  status: "preparing" | "ready" | "seat-delivered";
+};
+
 export type EventPayloads = {
   [EVENTS.ORDER_PLACED]: OrderPlacedEvent;
   [EVENTS.ITEM_ZERO_STOCK]: ItemZeroStockEvent;
+  [EVENTS.ORDER_STATUS_UPDATED]: OrderStatusUpdatedEvent;
 };

@@ -2,15 +2,18 @@ import type { FastifyReply, FastifyRequest } from "fastify";
 import type { CartItem } from "@commerical-cinema/schema";
 import { HTTP_STATUS } from "@commerical-cinema/core";
 import { EVENTS, type Queue } from "@commerical-cinema/event-bus";
-import type { OrderPlacedEvent } from "@commerical-cinema/event-bus";
+import type { OrderPlacedEvent, OrderStatusUpdatedEvent } from "@commerical-cinema/event-bus";
 import type { StockClient } from "@commerical-cinema/rpc";
 import type { OrderService } from "../services/order-service.js";
 import type { PaymentGateway } from "../payment/mockStripe.js";
 import {
+  ADMIN_STATUS_TRANSITIONS,
   CANCELLABLE_STATUSES,
   ERROR_MESSAGES,
   ORDER_STATUS_CANCELLED,
   STOCK_DECREMENT_RESULT,
+  type AdminTransitionFrom,
+  type AdminTransitionTo,
 } from "../static/index.js";
 
 type LogFn = (message: string, error?: unknown) => void;
@@ -18,11 +21,17 @@ type LogFn = (message: string, error?: unknown) => void;
 type OrderControllerDeps = {
   orderService: Pick<
     OrderService,
-    "createOrder" | "listOrders" | "getOrderWithItems" | "cancelOrderIfEligible"
+    | "createOrder"
+    | "listOrders"
+    | "getOrderWithItems"
+    | "cancelOrderIfEligible"
+    | "updateOrderStatus"
+    | "getOrderById"
   >;
   stockClient: Pick<StockClient, "decrement" | "release">;
   cartCleanupQueue: Pick<Queue<OrderPlacedEvent>, "add">;
   analyticsQueue: Pick<Queue<OrderPlacedEvent>, "add">;
+  notificationQueue: Pick<Queue<OrderStatusUpdatedEvent>, "add">;
   charge: PaymentGateway;
   log: LogFn;
 };
@@ -58,7 +67,7 @@ function isValidItem(value: unknown): value is CartItem {
 }
 
 export function createOrderController(deps: OrderControllerDeps) {
-  const { orderService, stockClient, cartCleanupQueue, analyticsQueue, charge, log } = deps;
+  const { orderService, stockClient, cartCleanupQueue, analyticsQueue, notificationQueue, charge, log } = deps;
 
   // Best-effort rollback of any units already reserved in Redis. Failures are logged
   // but never surfaced: the caller is already returning an error to the patron, and a
@@ -226,6 +235,47 @@ export function createOrderController(deps: OrderControllerDeps) {
       );
 
       return reply.status(HTTP_STATUS.OK).send({ orderId: cancelled.id, status: ORDER_STATUS_CANCELLED });
+    },
+
+    async updateOrderStatus(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+      const { id } = request.params as { id: string };
+      const { status } = (request.body ?? {}) as { status?: unknown };
+
+      if (typeof status !== "string") {
+        return reply.status(HTTP_STATUS.BAD_REQUEST).send({ error: ERROR_MESSAGES.INVALID_ORDER_STATUS });
+      }
+
+      const order = await orderService.getOrderById(id);
+      if (!order) {
+        return reply.status(HTTP_STATUS.NOT_FOUND).send({ error: ERROR_MESSAGES.ORDER_NOT_FOUND });
+      }
+
+      const currentStatus = order.status;
+      const allowedNext = ADMIN_STATUS_TRANSITIONS[currentStatus as AdminTransitionFrom];
+      if (!allowedNext || allowedNext !== status) {
+        return reply.status(HTTP_STATUS.BAD_REQUEST).send({ error: ERROR_MESSAGES.INVALID_STATUS_TRANSITION });
+      }
+
+      const updated = await orderService.updateOrderStatus(
+        id,
+        currentStatus,
+        status as AdminTransitionTo,
+      );
+      if (!updated) {
+        return reply.status(HTTP_STATUS.CONFLICT).send({ error: ERROR_MESSAGES.STATUS_CONFLICT });
+      }
+
+      const payload: OrderStatusUpdatedEvent = {
+        orderId: updated.id,
+        userId: updated.userId,
+        status: status as OrderStatusUpdatedEvent["status"],
+      };
+
+      notificationQueue.add(EVENTS.ORDER_STATUS_UPDATED, payload).catch((error: unknown) => {
+        log("OrderStatusUpdated publish failed (status committed)", error);
+      });
+
+      return reply.status(HTTP_STATUS.OK).send({ orderId: updated.id, status: updated.status });
     },
   };
 }

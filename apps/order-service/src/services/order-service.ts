@@ -110,4 +110,24 @@ export class OrderService {
 
     return order ?? null;
   }
+
+  // Admin status progression: conditional update so a racing admin request loses cleanly.
+  async updateOrderStatus(
+    orderId: string,
+    expectedStatus: Order["status"],
+    newStatus: Order["status"],
+  ): Promise<Order | null> {
+    const [order] = await this.db
+      .update(orders)
+      .set({ status: newStatus })
+      .where(and(eq(orders.id, orderId), eq(orders.status, expectedStatus)))
+      .returning();
+
+    return order ?? null;
+  }
+
+  async getOrderById(orderId: string): Promise<Order | null> {
+    const [order] = await this.db.select().from(orders).where(eq(orders.id, orderId));
+    return order ?? null;
+  }
 }
