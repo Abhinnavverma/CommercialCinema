@@ -1,7 +1,8 @@
 import Fastify from "fastify";
 import { registerJwt } from "@commerical-cinema/core";
 import { createDb } from "@commerical-cinema/schema";
-import { EVENTS, createQueue } from "@commerical-cinema/event-bus";
+import { EVENTS, QUEUES, createNamedQueue } from "@commerical-cinema/event-bus";
+import type { OrderPlacedEvent } from "@commerical-cinema/event-bus";
 import { createStockClient } from "@commerical-cinema/rpc";
 import { OrderService } from "./services/order-service.js";
 import { createOrderController } from "./controllers/order-controller.js";
@@ -22,7 +23,8 @@ const stockGrpcUrl = process.env.STOCK_SERVICE_GRPC_URL ?? DEFAULT_STOCK_SERVICE
 const app = Fastify({ logger: true });
 const db = createDb(databaseUrl);
 const stockClient = createStockClient(stockGrpcUrl);
-const orderPlacedQueue = createQueue(EVENTS.ORDER_PLACED, redisUrl);
+const cartCleanupQueue = createNamedQueue<OrderPlacedEvent>(QUEUES.CART_CLEANUP, redisUrl);
+const analyticsQueue = createNamedQueue<OrderPlacedEvent>(QUEUES.ANALYTICS, redisUrl);
 
 const orderService = new OrderService(db);
 
@@ -31,7 +33,8 @@ await registerJwt(app);
 const orderController = createOrderController({
   orderService,
   stockClient,
-  orderPlacedQueue,
+  cartCleanupQueue,
+  analyticsQueue,
   charge: chargePayment,
   log: (message, error) => app.log.error({ err: error }, message),
 });
@@ -40,7 +43,8 @@ await registerOrderRoutes(app, { orderController });
 app.get("/health", async () => ({ status: "ok", service: "order-service" }));
 
 app.addHook("onClose", async () => {
-  await orderPlacedQueue.close();
+  await cartCleanupQueue.close();
+  await analyticsQueue.close();
   stockClient.close();
 });
 

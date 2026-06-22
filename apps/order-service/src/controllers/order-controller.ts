@@ -21,7 +21,8 @@ type OrderControllerDeps = {
     "createOrder" | "listOrders" | "getOrderWithItems" | "cancelOrderIfEligible"
   >;
   stockClient: Pick<StockClient, "decrement" | "release">;
-  orderPlacedQueue: Pick<Queue<OrderPlacedEvent>, "add">;
+  cartCleanupQueue: Pick<Queue<OrderPlacedEvent>, "add">;
+  analyticsQueue: Pick<Queue<OrderPlacedEvent>, "add">;
   charge: PaymentGateway;
   log: LogFn;
 };
@@ -57,7 +58,7 @@ function isValidItem(value: unknown): value is CartItem {
 }
 
 export function createOrderController(deps: OrderControllerDeps) {
-  const { orderService, stockClient, orderPlacedQueue, charge, log } = deps;
+  const { orderService, stockClient, cartCleanupQueue, analyticsQueue, charge, log } = deps;
 
   // Best-effort rollback of any units already reserved in Redis. Failures are logged
   // but never surfaced: the caller is already returning an error to the patron, and a
@@ -147,12 +148,26 @@ export function createOrderController(deps: OrderControllerDeps) {
       // Step 4 - Publish. OrderPlaced fans out cart-clearing and analytics off the hot
       // path. The order is already paid and committed, so a publish failure is logged
       // rather than failing the checkout response.
+      const orderPlacedPayload: OrderPlacedEvent = {
+        orderId: order.id,
+        userId,
+        screenNumber: body.screenNumber,
+        seatNumber: body.seatNumber,
+        showtime: showtime.toISOString(),
+        ageGroup: request.user.ageGroup,
+        items: items.map((line) => ({
+          catalogItemId: line.catalogItemId,
+          quantity: line.quantity,
+          unitPriceCents: line.unitPriceCents,
+          name: line.name,
+        })),
+      };
+
       try {
-        await orderPlacedQueue.add(EVENTS.ORDER_PLACED, {
-          orderId: order.id,
-          userId,
-          items: items.map((line) => ({ catalogItemId: line.catalogItemId, quantity: line.quantity })),
-        });
+        await Promise.all([
+          cartCleanupQueue.add(EVENTS.ORDER_PLACED, orderPlacedPayload),
+          analyticsQueue.add(EVENTS.ORDER_PLACED, orderPlacedPayload),
+        ]);
       } catch (error) {
         log("OrderPlaced publish failed (order committed)", error);
       }

@@ -12,6 +12,7 @@ import type { PaymentGateway } from "../payment/mockStripe.js";
 import { ORDER_STATUS_CANCELLED, STOCK_DECREMENT_RESULT } from "../static/index.js";
 
 const userId = "user-123";
+const ageGroup = "25-34";
 
 const popcorn: CartItem = {
   catalogItemId: "popcorn-lg",
@@ -57,7 +58,7 @@ function fakeReply(captured: CapturedReply): FastifyReply {
 
 function fakeRequest(body?: unknown, params?: unknown): FastifyRequest {
   return {
-    user: { sub: userId, role: "patron" as const },
+    user: { sub: userId, role: "patron" as const, ageGroup },
     body,
     params,
   } as unknown as FastifyRequest;
@@ -134,7 +135,14 @@ function setup(options: SetupOptions = {}) {
     "createOrder" | "listOrders" | "getOrderWithItems" | "cancelOrderIfEligible"
   >;
 
-  const orderPlacedQueue = {
+  const cartCleanupQueue = {
+    async add(name: string, data: OrderPlacedEvent) {
+      publishedEvents.push({ name, data });
+      return undefined as unknown as Awaited<ReturnType<Queue<OrderPlacedEvent>["add"]>>;
+    },
+  } as unknown as Pick<Queue<OrderPlacedEvent>, "add">;
+
+  const analyticsQueue = {
     async add(name: string, data: OrderPlacedEvent) {
       publishedEvents.push({ name, data });
       return undefined as unknown as Awaited<ReturnType<Queue<OrderPlacedEvent>["add"]>>;
@@ -144,7 +152,8 @@ function setup(options: SetupOptions = {}) {
   const controller = createOrderController({
     orderService,
     stockClient,
-    orderPlacedQueue,
+    cartCleanupQueue,
+    analyticsQueue,
     charge: options.charge ?? noopCharge,
     log: () => {},
   });
@@ -209,17 +218,34 @@ describe("OrderController.placeOrder", () => {
       { catalogItemId: soda.catalogItemId, itemName: soda.name, quantity: soda.quantity, unitPriceCents: soda.unitPriceCents },
     ]);
 
-    // Published OrderPlaced for async cart-clear / analytics.
-    expect(publishedEvents).toHaveLength(1);
-    expect(publishedEvents[0]?.name).toBe(EVENTS.ORDER_PLACED);
-    expect(publishedEvents[0]?.data).toEqual({
+    // Published OrderPlaced to both cart-cleanup and analytics queues.
+    expect(publishedEvents).toHaveLength(2);
+    const expectedPayload = {
       orderId: "order-1",
       userId,
+      screenNumber: validBody.screenNumber,
+      seatNumber: validBody.seatNumber,
+      showtime: validBody.showtime,
+      ageGroup,
       items: [
-        { catalogItemId: popcorn.catalogItemId, quantity: popcorn.quantity },
-        { catalogItemId: soda.catalogItemId, quantity: soda.quantity },
+        {
+          catalogItemId: popcorn.catalogItemId,
+          quantity: popcorn.quantity,
+          unitPriceCents: popcorn.unitPriceCents,
+          name: popcorn.name,
+        },
+        {
+          catalogItemId: soda.catalogItemId,
+          quantity: soda.quantity,
+          unitPriceCents: soda.unitPriceCents,
+          name: soda.name,
+        },
       ],
-    });
+    };
+    expect(publishedEvents[0]?.name).toBe(EVENTS.ORDER_PLACED);
+    expect(publishedEvents[0]?.data).toEqual(expectedPayload);
+    expect(publishedEvents[1]?.name).toBe(EVENTS.ORDER_PLACED);
+    expect(publishedEvents[1]?.data).toEqual(expectedPayload);
 
     expect(captured.statusCode).toBe(HTTP_STATUS.CREATED);
     expect(captured.payload).toEqual({ orderId: "order-1", status: "placed", totalCents: expectedTotal });

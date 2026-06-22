@@ -8,7 +8,11 @@ export type EventName = (typeof EVENTS)[keyof typeof EVENTS];
 export type OrderPlacedEvent = {
   orderId: string;
   userId: string;
-  items: { catalogItemId: string; quantity: number }[];
+  screenNumber: number;
+  seatNumber: string;
+  showtime: string;
+  ageGroup?: string;
+  items: { catalogItemId: string; quantity: number; unitPriceCents: number; name: string }[];
 };
 
 export type ItemZeroStockEvent = {

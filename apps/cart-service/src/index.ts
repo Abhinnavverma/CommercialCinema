@@ -3,7 +3,7 @@ import { createRedis, registerJwt, HTTP_STATUS } from "@commerical-cinema/core";
 import { CartService } from "./services/cart-service.js";
 import { createCartController } from "./controllers/cart-controller.js";
 import { registerCartRoutes } from "./routes/cart-routes.js";
-import { startOrderPlacedConsumer } from "./consumers/order-placed.consumer.js";
+import { startCartCleanupConsumer } from "./consumers/cart-cleanup.consumer.js";
 import { DEFAULT_CART_SERVICE_PORT, DEFAULT_REDIS_URL } from "./static/index.js";
 
 const port = Number(process.env.CART_SERVICE_PORT ?? DEFAULT_CART_SERVICE_PORT);
@@ -19,7 +19,7 @@ await registerJwt(app);
 const cartController = createCartController({ cartService });
 await registerCartRoutes(app, { cartController });
 
-const orderPlacedWorker = startOrderPlacedConsumer(redisUrl, cartService);
+const cartCleanupWorker = startCartCleanupConsumer(redisUrl, cartService);
 
 app.get("/health", async () => ({ status: "ok", service: "cart-service" }));
 
@@ -37,7 +37,7 @@ app.get("/health/redis", async (_request, reply) => {
 });
 
 app.addHook("onClose", async () => {
-  await orderPlacedWorker.close();
+  await cartCleanupWorker.close();
   await redis.quit();
 });
 

@@ -37,6 +37,7 @@ export function createAuthController(deps: AuthControllerDeps) {
       sub: user.id,
       role: ROLES.PATRON,
       sessionId: user.sessionId,
+      ageGroup: user.ageGroup,
     } satisfies JwtPayload);
   }
 
