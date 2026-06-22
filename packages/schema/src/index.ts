@@ -6,6 +6,8 @@ export * from "./orders";
 export * from "./catalog-items";
 export * from "./inventory-sql";
 export * from "./analytics";
+export * from "./cart";
+export * from "./auth";
 
 import { users } from "./users";
 import { orders, orderItems } from "./orders";

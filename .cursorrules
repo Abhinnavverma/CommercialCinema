@@ -14,20 +14,47 @@ Your code must strictly adhere to the principle of "Depth over Fanciness." Avoid
 # Project Structure (Monorepo)
 /commercialCinema
   /apps
-    /api          # Fastify backend
-    /web          # Vite + React frontend
+    /gateway        # API Gateway / BFF: only public ingress, JWT validation, proxies to services
+    /user-service   # Auth + users (owns Postgres users)
+    /cart-service   # Cart (owns Redis carts) + OrderPlaced consumer
+      /src
+        /routes        # Path + middleware bindings to controller handlers ONLY
+        /controllers   # Business logic + request validation
+        /services      # Data access ONLY (Postgres/Drizzle, Redis)
+        /consumers     # BullMQ event consumers (e.g. OrderPlaced)
+        /static        # Service-specific constants, split into per-domain files
+    /web            # Vite + React frontend
   /packages
-    /schema       # Shared TS types and Drizzle schemas
-    /event-bus    # Shared BullMQ queue definitions
-  /docker         # docker-compose.yml (Redis, Postgres)
-  /load-tests     # k6 scripts
+    /schema         # Shared TS types and Drizzle schemas
+    /core           # Shared infra: JWT plugin, Redis factory, common constants
+    /event-bus      # Shared BullMQ connection, typed events, queue/worker helpers
+  /docker           # docker-compose.yml (Redis, Postgres)
+  /load-tests       # k6 scripts
 
 # Backend Engineering Rules (Strict Concurrency)
 1. NEVER USE READ-MODIFY-WRITE PATTERNS for inventory. All stock decrements MUST happen via atomic Lua scripts in Redis.
 2. The Database (Postgres) is for persistent cold storage and analytics only. Do NOT query Postgres on the checkout hot-path (`POST /orders`).
 3. Cross-service communication during checkout must be decoupled. Use BullMQ to publish `OrderPlaced` and `ItemZeroStock` events. Do not use synchronous HTTP calls to clear carts or save analytics.
-4. Fastify endpoints should be lean. Move business logic into specific domain services (e.g., `StockService`, `OrderService`).
+4. Fastify endpoints should be lean. Routes ONLY map a path + middleware to a controller handler; ALL business logic lives in controllers (see Backend MVC Layering below).
 5. Handle errors explicitly. Return standard HTTP status codes (e.g., 409 Conflict for out-of-stock, 400 Bad Request for invalid payload).
+
+# Backend MVC Layering (Strict)
+The backend follows a standard MVC layering. Each rule below is mandatory for consistent output:
+1. MVC architecture: the backend is organized as Routes -> Controllers -> Services, with the Model being the Drizzle schemas in `packages/schema` plus Redis-backed state. There is no View layer (JSON API).
+2. Routes ONLY navigate: a route file maps the URL path and attaches middleware (e.g. `authenticate`, `requireRole`) and points to a controller handler. Routes contain NO validation and NO business logic.
+3. Controllers hold ALL business logic AND request validation: payload validation, orchestration (e.g. cart merge / empty-cart handling), token signing, error-to-HTTP mapping, and response shaping all happen in controllers.
+4. Services exist solely for data work: services perform DB (Postgres/Drizzle) and Redis access only. Controllers call services for ALL data access. Services contain NO HTTP concerns and NO request validation (DB-error translation, e.g. unique-violation -> domain error, may stay in a service since it interprets a storage signal).
+5. Constants live in a dedicated `static/` folder: declare every constant across separate per-domain files (e.g. `static/cart.constants.ts`, `static/error.constants.ts`, `static/config.constants.ts`) and re-export via `static/index.ts`. NEVER inline magic numbers, key prefixes, error message strings, or HTTP status codes. Cross-cutting constants (HTTP_STATUS, ROLES, PG error codes, JWT defaults) live in `packages/core`; service-specific constants live in that service's own `static/`.
+
+# Microservices Architecture (Strict)
+The backend is a set of independently-deployable microservices, NOT a modular monolith. Each rule below is mandatory:
+1. Each backend capability is its own deployable service with its own process, port, and `package.json` (e.g. `apps/gateway`, `apps/user-service`, `apps/cart-service`).
+2. Services share code ONLY through `packages/*` (`schema`, `core`, `event-bus`). NEVER import another service's `src` directly.
+3. The API Gateway / BFF (`apps/gateway`) is the ONLY public ingress. It validates JWT and routes/proxies to downstream services and hydrates checkout payloads (e.g. cart) for `POST /orders`.
+4. Synchronous cross-service calls go THROUGH the gateway. Cross-cutting side-effects (cart clearance, notifications, analytics) are decoupled via BullMQ events (`OrderPlaced`, `ItemZeroStock`) consumed in a service's `consumers/`, never via synchronous service-to-service HTTP on the hot path.
+5. Each service owns its datastore exclusively (User Service -> Postgres users, Cart Service -> Redis carts). No service writes to another service's datastore.
+6. All services share the same `JWT_SECRET` so tokens issued by the User Service verify everywhere; every service re-verifies JWTs (defense-in-depth) using `registerJwt` from `packages/core`.
+7. The MVC layering + `static/` constants rules above apply WITHIN every service.
 
 # Frontend Engineering Rules
 1. Keep the UI minimal and functional. We are not building pixel-perfect animations; we are building a fast UI that reacts to WebSockets.

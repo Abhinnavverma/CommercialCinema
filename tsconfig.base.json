@@ -13,7 +13,11 @@
     "noEmit": true,
     "paths": {
       "@commerical-cinema/schema": ["./packages/schema/src/index.ts"],
-      "@commerical-cinema/schema/*": ["./packages/schema/src/*"]
+      "@commerical-cinema/schema/*": ["./packages/schema/src/*"],
+      "@commerical-cinema/core": ["./packages/core/src/index.ts"],
+      "@commerical-cinema/core/*": ["./packages/core/src/*"],
+      "@commerical-cinema/event-bus": ["./packages/event-bus/src/index.ts"],
+      "@commerical-cinema/event-bus/*": ["./packages/event-bus/src/*"]
     }
   }
 }

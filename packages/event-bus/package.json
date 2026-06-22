@@ -1,5 +1,5 @@
 {
-  "name": "@commerical-cinema/schema",
+  "name": "@commerical-cinema/event-bus",
   "version": "0.0.1",
   "private": true,
   "type": "module",
@@ -9,16 +9,13 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "db:generate": "drizzle-kit generate",
-    "db:migrate": "bun --env-file=../../.env run src/migrate.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "drizzle-orm": "^0.44.2",
-    "postgres": "^3.4.7"
+    "bullmq": "^5.34.0",
+    "ioredis": "^5.10.1"
   },
   "devDependencies": {
-    "@types/node": "^22.15.30",
-    "drizzle-kit": "^0.31.1"
+    "@types/node": "^22.15.30"
   }
 }

@@ -1,18 +1,21 @@
 {
-  "name": "@commerical-cinema/api",
+  "name": "@commerical-cinema/core",
   "version": "0.0.1",
   "private": true,
   "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
   "scripts": {
-    "dev": "bun --env-file=../../.env run --watch src/index.ts",
-    "start": "bun --env-file=../../.env run src/index.ts"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@commerical-cinema/schema": "workspace:*",
-    "drizzle-orm": "^0.44.2",
+    "@fastify/jwt": "^10.1.0",
     "fastify": "^5.4.0",
-    "ioredis": "^5.6.1",
-    "postgres": "^3.4.7"
+    "ioredis": "^5.10.1"
   },
   "devDependencies": {
     "@types/node": "^22.15.30"
