@@ -1,0 +1,19 @@
+{
+  "name": "commerical-cinema",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:api": "bun run --filter @commerical-cinema/api dev",
+    "dev:web": "bun run --filter @commerical-cinema/web dev",
+    "db:up": "docker compose -f docker/docker-compose.yml up -d",
+    "db:down": "docker compose -f docker/docker-compose.yml down",
+    "db:generate": "bun run --filter @commerical-cinema/schema db:generate",
+    "db:migrate": "bun run --filter @commerical-cinema/schema db:migrate"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.3"
+  }
+}

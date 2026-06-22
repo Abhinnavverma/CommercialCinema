@@ -1,0 +1,20 @@
+{
+  "name": "@commerical-cinema/api",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun --env-file=../../.env run --watch src/index.ts",
+    "start": "bun --env-file=../../.env run src/index.ts"
+  },
+  "dependencies": {
+    "@commerical-cinema/schema": "workspace:*",
+    "drizzle-orm": "^0.44.2",
+    "fastify": "^5.4.0",
+    "ioredis": "^5.6.1",
+    "postgres": "^3.4.7"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.30"
+  }
+}

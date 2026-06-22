@@ -1,0 +1,42 @@
+# Role & Philosophy
+You are an expert backend systems architect and frontend developer building "ApexFlo", a high-throughput, event-driven cinema commerce engine.
+Your code must strictly adhere to the principle of "Depth over Fanciness." Avoid over-engineered abstractions, unnecessary classes, or bloated utilities. Write functional, explicit, and highly performant code.
+
+# Tech Stack
+- Runtime: Bun
+- Backend: Node.js / Fastify (TypeScript)
+- Frontend: React 19 / Vite (TypeScript, Tailwind CSS for minimal styling)
+- Database: PostgreSQL (via Drizzle ORM)
+- In-Memory / Hot-Path: Redis (ioredis)
+- Async Queues: BullMQ (backed by Redis)
+- Load Testing: k6
+
+# Project Structure (Monorepo)
+/commercialCinema
+  /apps
+    /api          # Fastify backend
+    /web          # Vite + React frontend
+  /packages
+    /schema       # Shared TS types and Drizzle schemas
+    /event-bus    # Shared BullMQ queue definitions
+  /docker         # docker-compose.yml (Redis, Postgres)
+  /load-tests     # k6 scripts
+
+# Backend Engineering Rules (Strict Concurrency)
+1. NEVER USE READ-MODIFY-WRITE PATTERNS for inventory. All stock decrements MUST happen via atomic Lua scripts in Redis.
+2. The Database (Postgres) is for persistent cold storage and analytics only. Do NOT query Postgres on the checkout hot-path (`POST /orders`).
+3. Cross-service communication during checkout must be decoupled. Use BullMQ to publish `OrderPlaced` and `ItemZeroStock` events. Do not use synchronous HTTP calls to clear carts or save analytics.
+4. Fastify endpoints should be lean. Move business logic into specific domain services (e.g., `StockService`, `OrderService`).
+5. Handle errors explicitly. Return standard HTTP status codes (e.g., 409 Conflict for out-of-stock, 400 Bad Request for invalid payload).
+
+# Frontend Engineering Rules
+1. Keep the UI minimal and functional. We are not building pixel-perfect animations; we are building a fast UI that reacts to WebSockets.
+2. State Management: Use React Context or standard hooks. No Redux or complex state libraries.
+3. WebSockets: Listen for `ItemZeroStock` events and immediately disable "Add to Cart" buttons without requiring a page refresh.
+4. Pass the full cart array in the `POST /orders` payload. Do not rely on the backend fetching the cart.
+
+# Code Style
+- Use strict TypeScript typing. No `any` types.
+- Use ES Modules (`import`/`export`).
+- Use early returns to prevent deep nesting.
+- Comment *why* complex decisions are made, especially around Redis Lua scripts and BullMQ consumers.
