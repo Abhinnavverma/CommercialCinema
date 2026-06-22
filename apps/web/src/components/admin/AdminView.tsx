@@ -1,5 +1,6 @@
 import { useAuth } from "../../context/AuthContext.js";
 import { AdminLoginForm } from "./AdminLoginForm.js";
+import { AnalyticsDashboard } from "./AnalyticsDashboard.js";
 import { OrdersTable } from "./OrdersTable.js";
 import { SimulationPanel } from "./SimulationPanel.js";
 import { StockManager } from "./StockManager.js";
@@ -12,6 +13,7 @@ export function AdminView() {
       {adminToken ? (
         <>
           <SimulationPanel />
+          <AnalyticsDashboard />
           <OrdersTable />
           <StockManager />
         </>

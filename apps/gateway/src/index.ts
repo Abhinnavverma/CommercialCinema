@@ -7,6 +7,7 @@ import {
   DEFAULT_MENU_SERVICE_URL,
   DEFAULT_NOTIFICATION_SERVICE_WS_URL,
   DEFAULT_ORDER_SERVICE_URL,
+  DEFAULT_ANALYTICS_SERVICE_URL,
   DEFAULT_DIGITAL_TWIN_SERVICE_URL,
   DEFAULT_STOCK_SERVICE_URL,
   DEFAULT_USER_SERVICE_URL,
@@ -19,6 +20,7 @@ const userServiceUrl = process.env.USER_SERVICE_URL ?? DEFAULT_USER_SERVICE_URL;
 const cartServiceUrl = process.env.CART_SERVICE_URL ?? DEFAULT_CART_SERVICE_URL;
 const menuServiceUrl = process.env.MENU_SERVICE_URL ?? DEFAULT_MENU_SERVICE_URL;
 const orderServiceUrl = process.env.ORDER_SERVICE_URL ?? DEFAULT_ORDER_SERVICE_URL;
+const analyticsServiceUrl = process.env.ANALYTICS_SERVICE_URL ?? DEFAULT_ANALYTICS_SERVICE_URL;
 const stockServiceUrl = process.env.STOCK_SERVICE_URL ?? DEFAULT_STOCK_SERVICE_URL;
 const digitalTwinServiceUrl =
   process.env.DIGITAL_TWIN_SERVICE_URL ?? DEFAULT_DIGITAL_TWIN_SERVICE_URL;
@@ -92,6 +94,9 @@ app.get("/menu/:id", (request, reply) => forward(request, reply, menuServiceUrl)
 const adminGuard = { preHandler: [app.authenticate, app.requireRole(ROLES.ADMIN)] };
 app.get("/admin/orders", adminGuard, (request, reply) => forward(request, reply, orderServiceUrl));
 app.get("/admin/orders/:id", adminGuard, (request, reply) => forward(request, reply, orderServiceUrl));
+app.get("/admin/analytics/dashboard", adminGuard, (request, reply) =>
+  forward(request, reply, analyticsServiceUrl),
+);
 app.put("/orders/:id/status", adminGuard, (request, reply) => forward(request, reply, orderServiceUrl));
 app.post("/stock/refill", adminGuard, (request, reply) => forward(request, reply, stockServiceUrl));
 app.get("/admin/stock", adminGuard, (request, reply) => forward(request, reply, stockServiceUrl));

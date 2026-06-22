@@ -32,7 +32,14 @@ When ready, open:
 
 **Admin login** (default): `admin@apexflo.local` / `admin123`
 
-Run a load simulation from **Admin → Digital Twin Simulator**.
+## Reviewer quick test (5 minutes)
+
+1. **Start:** `bun run start` — wait for the “ApexFlo is ready” banner.
+2. **Patron flow:** Open http://localhost:5173 → **Patron** tab → add items to cart → checkout.
+3. **Live stock:** Watch items disable when stock hits zero (WebSocket indicator in header).
+4. **Admin orders:** **Admin** tab → log in → view orders, advance status, manage stock.
+5. **Analytics (Tier 1):** **Admin** → **Analytics Dashboard** → click **Refresh** after orders or a simulation. See total orders/revenue, top items, breakdowns by screen, showtime, and age group.
+6. **Load test (optional):** **Admin** → **Digital Twin Simulator** → run *Opening Night* or *Intermission Popcorn Crush* → refresh Analytics Dashboard.
 
 ## Development mode
 
@@ -75,7 +82,7 @@ apps/
   menu-service/     Catalog reads + live stock
   stock-service/    Atomic Redis inventory (Lua) + write-behind
   order-service/    Checkout hot path
-  analytics-service/ Tier-1 analytics ingestion
+  analytics-service/ Tier-1 analytics ingestion + dashboard API
   notification-service/ WebSocket fan-out
   digital-twin/     Load simulator
   web/              React patron + admin UI

@@ -13,6 +13,7 @@
       "name": "@commerical-cinema/analytics-service",
       "version": "0.0.1",
       "dependencies": {
+        "@commerical-cinema/core": "workspace:*",
         "@commerical-cinema/event-bus": "workspace:*",
         "@commerical-cinema/schema": "workspace:*",
         "drizzle-orm": "^0.44.2",

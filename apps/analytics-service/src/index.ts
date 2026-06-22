@@ -1,5 +1,8 @@
 import Fastify from "fastify";
+import { registerJwt } from "@commerical-cinema/core";
 import { createDb } from "@commerical-cinema/schema";
+import { createAnalyticsController } from "./controllers/analytics-controller.js";
+import { registerAnalyticsRoutes } from "./routes/analytics-routes.js";
 import { AnalyticsService } from "./services/analytics-service.js";
 import { createAnalyticsBatcher } from "./workers/analytics-batcher.js";
 import { startAnalyticsConsumer } from "./consumers/analytics.consumer.js";
@@ -16,6 +19,14 @@ const databaseUrl = process.env.DATABASE_URL ?? DEFAULT_DATABASE_URL;
 const app = Fastify({ logger: true });
 const db = createDb(databaseUrl);
 const analyticsService = new AnalyticsService(db);
+
+const analyticsController = createAnalyticsController({
+  analyticsService,
+  log: (message, error) => app.log.error({ err: error }, message),
+});
+
+await registerJwt(app);
+await registerAnalyticsRoutes(app, { analyticsController });
 
 const batcher = createAnalyticsBatcher({
   analyticsService,

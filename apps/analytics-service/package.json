@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@commerical-cinema/core": "workspace:*",
     "@commerical-cinema/event-bus": "workspace:*",
     "@commerical-cinema/schema": "workspace:*",
     "drizzle-orm": "^0.44.2",

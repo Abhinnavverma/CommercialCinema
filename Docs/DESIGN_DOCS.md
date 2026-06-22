@@ -102,7 +102,7 @@ Seed catalog: 7 SKUs (`popcorn-lg`, `popcorn-sm`, `soda-lg`, `nachos`, `hotdog`,
 | Tier | Status | Implementation |
 |------|--------|----------------|
 | **0 — Ordering + stock** | Complete | Lua decrement, 409 on OOS, WS propagation, cart, checkout, order tracking |
-| **1 — Analytics** | Complete | `OrderPlaced` → analytics-service batcher → `analytics_events` |
+| **1 — Analytics** | Complete | `OrderPlaced` → batcher → `analytics_events` → admin dashboard API + UI |
 | **2 — Offers/promotions** | Out of scope | Documented as future work |
 
 ---
@@ -295,9 +295,10 @@ sequenceDiagram
 - **Consume:** analytics-service worker pulls from `AnalyticsQueue`.
 - **Batch:** In-memory buffer flushes every **5s** or **1000 events** (`analytics-batcher.ts`).
 - **Persist:** `bulkInsert` into `analytics_events` (JSONB payload, indexed by `event_type`, `showtime`).
-- **No query API in v1** — service is ingestion-only + `/health`.
+- **Read API:** `GET /admin/analytics/dashboard` (admin JWT) returns aggregates: summary, top items, orders by screen/showtime/age group, recent orders. SQL aggregates over `analytics_events` including JSONB line-item unpacking.
+- **Admin UI:** `AnalyticsDashboard` component on the Admin tab — stat cards and tables with manual refresh (useful after digital-twin runs).
 
-**Rationale:** Analytics is read-heavy and wide-column. Keeping it out of checkout and out of transactional Postgres tables prevents index thrashing on the order path.
+**Rationale:** Analytics is read-heavy and wide-column. Ingestion stays off the checkout hot path; reads hit the cold `analytics_events` table via a dedicated service, not transactional order tables.
 
 ---
 
