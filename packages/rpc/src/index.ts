@@ -4,6 +4,8 @@ import type {
   DecrementResponse,
   GetStockRequest,
   GetStockResponse,
+  ReleaseRequest,
+  ReleaseResponse,
 } from "./types.js";
 
 export * from "./types.js";
@@ -15,4 +17,5 @@ export { stockProto, stockServiceDefinition } from "./proto.js";
 export type StockServiceHandlers = {
   GetStock: handleUnaryCall<GetStockRequest, GetStockResponse>;
   Decrement: handleUnaryCall<DecrementRequest, DecrementResponse>;
+  Release: handleUnaryCall<ReleaseRequest, ReleaseResponse>;
 };

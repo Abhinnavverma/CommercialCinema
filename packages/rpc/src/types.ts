@@ -23,3 +23,12 @@ export type DecrementResponse = {
   code: number;
   remaining: number;
 };
+
+export type ReleaseRequest = {
+  itemId: string;
+  quantity: number;
+};
+
+export type ReleaseResponse = {
+  remaining: number;
+};

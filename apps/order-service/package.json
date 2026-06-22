@@ -1,5 +1,5 @@
 {
-  "name": "@commerical-cinema/menu-service",
+  "name": "@commerical-cinema/order-service",
   "version": "0.0.1",
   "private": true,
   "type": "module",
@@ -11,8 +11,10 @@
   },
   "dependencies": {
     "@commerical-cinema/core": "workspace:*",
+    "@commerical-cinema/event-bus": "workspace:*",
     "@commerical-cinema/rpc": "workspace:*",
     "@commerical-cinema/schema": "workspace:*",
+    "@grpc/grpc-js": "^1.12.5",
     "drizzle-orm": "^0.44.2",
     "fastify": "^5.4.0",
     "postgres": "^3.4.7"

@@ -70,5 +70,28 @@ export function createStockController(deps: StockControllerDeps): StockServiceHa
           callback({ code: status.INTERNAL, details: ERROR_MESSAGES.DECREMENT_FAILED }, null);
         });
     },
+
+    Release(call, callback) {
+      const { itemId, quantity } = call.request;
+
+      if (!itemId || typeof itemId !== "string") {
+        callback({ code: status.INVALID_ARGUMENT, details: ERROR_MESSAGES.ITEM_ID_REQUIRED }, null);
+        return;
+      }
+      if (!Number.isInteger(quantity) || quantity <= 0) {
+        callback({ code: status.INVALID_ARGUMENT, details: ERROR_MESSAGES.INVALID_QUANTITY }, null);
+        return;
+      }
+
+      stockService
+        .release(itemId, quantity)
+        .then((remaining) => {
+          callback(null, { remaining });
+        })
+        .catch((error: unknown) => {
+          log("Release failed", error);
+          callback({ code: status.INTERNAL, details: ERROR_MESSAGES.RELEASE_FAILED }, null);
+        });
+    },
   };
 }

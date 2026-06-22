@@ -18,5 +18,9 @@ export const WRITE_BEHIND_INTERVAL_MS = 5000;
 // SCAN page size while sweeping stock keys during a write-behind flush.
 export const STOCK_SCAN_COUNT = 200;
 
-// Name of the custom command registered on the Redis client via defineCommand.
+// Names of the custom commands registered on the Redis client via defineCommand.
 export const DECREMENT_COMMAND = "decrementStock";
+export const RELEASE_COMMAND = "releaseStock";
+
+// Returned by release-stock.lua when the key does not exist (cannot be resurrected).
+export const RELEASE_KEY_MISSING = -1;

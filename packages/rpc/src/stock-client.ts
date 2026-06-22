@@ -5,6 +5,8 @@ import type {
   DecrementResponse,
   GetStockRequest,
   GetStockResponse,
+  ReleaseRequest,
+  ReleaseResponse,
 } from "./types.js";
 
 type UnaryMethod<Req, Res> = (
@@ -16,11 +18,13 @@ type UnaryMethod<Req, Res> = (
 type RawStockClient = grpc.Client & {
   GetStock: UnaryMethod<GetStockRequest, GetStockResponse>;
   Decrement: UnaryMethod<DecrementRequest, DecrementResponse>;
+  Release: UnaryMethod<ReleaseRequest, ReleaseResponse>;
 };
 
 export type StockClient = {
   getStock(request: GetStockRequest): Promise<GetStockResponse>;
   decrement(request: DecrementRequest): Promise<DecrementResponse>;
+  release(request: ReleaseRequest): Promise<ReleaseResponse>;
   close(): void;
 };
 
@@ -49,6 +53,7 @@ export function createStockClient(address: string): StockClient {
   return {
     getStock: (request) => callUnary(raw.GetStock, raw, request),
     decrement: (request) => callUnary(raw.Decrement, raw, request),
+    release: (request) => callUnary(raw.Release, raw, request),
     close: () => raw.close(),
   };
 }

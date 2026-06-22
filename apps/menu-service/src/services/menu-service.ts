@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { catalogItems, type CatalogItem, type Db } from "@commerical-cinema/schema";
 import type { StockClient } from "@commerical-cinema/rpc";
 
@@ -51,5 +51,33 @@ export class MenuService {
         inStock: available > 0,
       };
     });
+  }
+
+  // Single-item detail view. Unlike getMenu (served from the in-memory catalog), this
+  // reads the static row straight from Postgres so a freshly added/edited item is
+  // reflected without a service restart, then merges the live count from the Stock
+  // Service (Redis-backed) over gRPC. Returns null when the item is absent or inactive.
+  async getMenuItem(id: string): Promise<MenuItem | null> {
+    const [item] = await this.db
+      .select()
+      .from(catalogItems)
+      .where(and(eq(catalogItems.id, id), eq(catalogItems.isActive, true)));
+
+    if (!item) {
+      return null;
+    }
+
+    const { levels } = await this.stockClient.getStock({ itemIds: [id] });
+    const available = levels.find((level) => level.itemId === id)?.available ?? 0;
+
+    return {
+      id: item.id,
+      name: item.name,
+      description: item.description,
+      imageUrl: item.imageUrl,
+      priceCents: item.priceCents,
+      available,
+      inStock: available > 0,
+    };
   }
 }

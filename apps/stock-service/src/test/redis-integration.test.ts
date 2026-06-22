@@ -116,6 +116,27 @@ describe.skipIf(!reachable)("StockService atomic decrement (real Redis)", () => 
     expect(Number(await redis.get(buildStockKey(itemId)))).toBe(3);
   });
 
+  test("release returns reserved units to the pool atomically", async () => {
+    const itemId = `test-release-${Date.now()}`;
+    await seed(itemId, 10);
+
+    const reserved = await service.decrement(itemId, 4);
+    expect(reserved.code).toBe(DECREMENT_RESULT.SUCCESS);
+    expect(reserved.remaining).toBe(6);
+
+    const remaining = await service.release(itemId, 4);
+    expect(remaining).toBe(10);
+    expect(Number(await redis.get(buildStockKey(itemId)))).toBe(10);
+  });
+
+  test("release on a missing key returns -1 without creating it", async () => {
+    const itemId = `test-release-missing-${Date.now()}`;
+    const remaining = await service.release(itemId, 1);
+
+    expect(remaining).toBe(-1);
+    expect(await redis.get(buildStockKey(itemId))).toBeNull();
+  });
+
   test("getStock returns live counts and 0 for unknown items", async () => {
     const known = `test-getstock-${Date.now()}`;
     await seed(known, 42);

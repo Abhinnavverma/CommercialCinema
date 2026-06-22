@@ -1,0 +1,13 @@
+export const ERROR_MESSAGES = {
+  INVALID_ORDER_PAYLOAD: "Invalid order payload",
+  EMPTY_CART: "Order must contain at least one item",
+  INVALID_SCREEN: "screenNumber must be a positive integer",
+  INVALID_SEAT: "seatNumber is required",
+  INVALID_SHOWTIME: "showtime must be a valid ISO timestamp",
+  OUT_OF_STOCK: "One or more items are out of stock",
+  PAYMENT_DECLINED: "Payment was declined",
+  PAYMENT_GATEWAY_ERROR: "Payment could not be processed, please try again",
+  ORDER_ID_REQUIRED: "orderId is required",
+  ORDER_NOT_FOUND: "Order not found",
+  ORDER_NOT_CANCELLABLE: "Order can no longer be cancelled",
+} as const;

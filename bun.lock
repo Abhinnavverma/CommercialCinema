@@ -47,6 +47,25 @@
         "postgres": "^3.4.7",
       },
       "devDependencies": {
+        "@types/bun": "^1.3.14",
+        "@types/node": "^22.15.30",
+      },
+    },
+    "apps/order-service": {
+      "name": "@commerical-cinema/order-service",
+      "version": "0.0.1",
+      "dependencies": {
+        "@commerical-cinema/core": "workspace:*",
+        "@commerical-cinema/event-bus": "workspace:*",
+        "@commerical-cinema/rpc": "workspace:*",
+        "@commerical-cinema/schema": "workspace:*",
+        "@grpc/grpc-js": "^1.12.5",
+        "drizzle-orm": "^0.44.2",
+        "fastify": "^5.4.0",
+        "postgres": "^3.4.7",
+      },
+      "devDependencies": {
+        "@types/bun": "^1.3.14",
         "@types/node": "^22.15.30",
       },
     },
@@ -199,6 +218,8 @@
     "@commerical-cinema/gateway": ["@commerical-cinema/gateway@workspace:apps/gateway"],
 
     "@commerical-cinema/menu-service": ["@commerical-cinema/menu-service@workspace:apps/menu-service"],
+
+    "@commerical-cinema/order-service": ["@commerical-cinema/order-service@workspace:apps/order-service"],
 
     "@commerical-cinema/rpc": ["@commerical-cinema/rpc@workspace:packages/rpc"],
 

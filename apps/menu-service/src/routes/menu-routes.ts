@@ -8,4 +8,5 @@ type MenuRoutesOptions = {
 export async function registerMenuRoutes(app: FastifyInstance, options: MenuRoutesOptions) {
   const { menuController } = options;
   app.get("/menu", menuController.getMenu);
+  app.get("/menu/:id", menuController.getMenuItem);
 }

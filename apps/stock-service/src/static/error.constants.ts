@@ -3,4 +3,5 @@ export const ERROR_MESSAGES = {
   INVALID_QUANTITY: "quantity must be a positive integer",
   GET_STOCK_FAILED: "Failed to read stock",
   DECREMENT_FAILED: "Failed to decrement stock",
+  RELEASE_FAILED: "Failed to release stock",
 } as const;

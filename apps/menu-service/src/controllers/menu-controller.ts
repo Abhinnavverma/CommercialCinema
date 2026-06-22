@@ -6,7 +6,7 @@ import { ERROR_MESSAGES } from "../static/index.js";
 type LogFn = (message: string, error?: unknown) => void;
 
 type MenuControllerDeps = {
-  menuService: MenuService;
+  menuService: Pick<MenuService, "getMenu" | "getMenuItem">;
   log: LogFn;
 };
 
@@ -22,6 +22,22 @@ export function createMenuController(deps: MenuControllerDeps) {
         // If the Stock Service is unreachable we fail the read rather than serve stale
         // availability; the gateway/UI can retry. Catalog browsing is non-critical.
         log("Failed to build menu", error);
+        return reply
+          .status(HTTP_STATUS.SERVICE_UNAVAILABLE)
+          .send({ error: ERROR_MESSAGES.STOCK_SERVICE_UNAVAILABLE });
+      }
+    },
+
+    async getMenuItem(request: FastifyRequest, reply: FastifyReply): Promise<MenuItem | void> {
+      const { id } = request.params as { id: string };
+      try {
+        const item = await menuService.getMenuItem(id);
+        if (!item) {
+          return reply.status(HTTP_STATUS.NOT_FOUND).send({ error: ERROR_MESSAGES.MENU_ITEM_NOT_FOUND });
+        }
+        return item;
+      } catch (error) {
+        log("Failed to build menu item", error);
         return reply
           .status(HTTP_STATUS.SERVICE_UNAVAILABLE)
           .send({ error: ERROR_MESSAGES.STOCK_SERVICE_UNAVAILABLE });
