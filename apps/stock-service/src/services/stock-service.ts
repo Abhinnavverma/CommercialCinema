@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import type { Redis } from "ioredis";
+import { SEED_PRODUCTS } from "@commerical-cinema/schema";
 import { DECREMENT_COMMAND, RELEASE_COMMAND, buildStockKey } from "../static/index.js";
 
 // Loaded once at module init; registered on the Redis client as custom commands.
@@ -69,5 +70,31 @@ export class StockService {
   // a reservation when payment fails or a multi-item order is only partially satisfied.
   async release(itemId: string, quantity: number): Promise<number> {
     return this.redis.releaseStock(buildStockKey(itemId), quantity);
+  }
+
+  // Admin refill: reset every catalog item to its canonical opening inventory from SEED_PRODUCTS.
+  async refillAll(): Promise<number> {
+    const pipeline = this.redis.pipeline();
+    for (const product of SEED_PRODUCTS) {
+      pipeline.set(buildStockKey(product.id), String(product.initialStock));
+    }
+    await pipeline.exec();
+    return SEED_PRODUCTS.length;
+  }
+
+  // Admin set: absolute stock level for a single catalog item.
+  async setStock(itemId: string, quantity: number): Promise<number> {
+    await this.redis.set(buildStockKey(itemId), String(quantity));
+    return quantity;
+  }
+
+  async listAllStock(): Promise<{ itemId: string; name: string; available: number }[]> {
+    const itemIds = SEED_PRODUCTS.map((product) => product.id);
+    const levels = await this.getStock(itemIds);
+    return SEED_PRODUCTS.map((product) => ({
+      itemId: product.id,
+      name: product.name,
+      available: levels.get(product.id) ?? 0,
+    }));
   }
 }

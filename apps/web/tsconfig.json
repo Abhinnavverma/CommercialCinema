@@ -5,7 +5,8 @@
     "jsx": "react-jsx",
     "noEmit": true,
     "moduleResolution": "bundler",
-    "allowImportingTsExtensions": true
+    "allowImportingTsExtensions": true,
+    "types": ["vitest/globals"]
   },
   "include": ["src"]
 }

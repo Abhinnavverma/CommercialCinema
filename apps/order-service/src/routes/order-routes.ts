@@ -12,6 +12,8 @@ export async function registerOrderRoutes(app: FastifyInstance, options: OrderRo
   const adminOnly = [app.authenticate, app.requireRole(ROLES.ADMIN)];
 
   app.put("/orders/:id/status", { preHandler: adminOnly }, orderController.updateOrderStatus);
+  app.get("/admin/orders", { preHandler: adminOnly }, orderController.listAllOrders);
+  app.get("/admin/orders/:id", { preHandler: adminOnly }, orderController.getAdminOrder);
   app.post("/orders", { preHandler: patronOnly }, orderController.placeOrder);
   app.get("/orders", { preHandler: patronOnly }, orderController.listOrders);
   // Registered before "/orders/:id" so the literal "cancel" segment is never captured

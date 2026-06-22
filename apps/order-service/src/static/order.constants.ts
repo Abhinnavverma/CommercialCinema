@@ -6,6 +6,11 @@ export const PAYMENT_LATENCY_MS = 500;
 // reservation-release path is exercised under load tests.
 export const PAYMENT_SUCCESS_RATE = 0.85;
 
+// Digital-twin live runs identify themselves via this header so checkout isolates
+// stock/queue stress from random payment declines (see mockStripe.chargeSimulationPayment).
+export const SIMULATION_REQUEST_HEADER = "x-apexflo-simulation";
+export const SIMULATION_REQUEST_VALUE = "twin";
+
 // Persisted order status once payment has cleared (mirrors the orderStatusEnum).
 export const ORDER_STATUS_PLACED = "placed";
 

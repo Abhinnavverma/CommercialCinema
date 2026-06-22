@@ -22,5 +22,8 @@ export const STOCK_SCAN_COUNT = 200;
 export const DECREMENT_COMMAND = "decrementStock";
 export const RELEASE_COMMAND = "releaseStock";
 
+export const STOCK_REFILL_ROUTE = "/stock/refill";
+export const ADMIN_STOCK_ROUTE = "/admin/stock";
+
 // Returned by release-stock.lua when the key does not exist (cannot be resurrected).
 export const RELEASE_KEY_MISSING = -1;

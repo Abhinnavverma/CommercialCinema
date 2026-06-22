@@ -68,6 +68,7 @@ type SetupOptions = {
   charge?: PaymentGateway;
   insufficientFor?: string;
   listResult?: Order[];
+  listAllResult?: Order[];
   orderRecord?: OrderWithItems | null;
   orderById?: Order | null;
 };
@@ -115,6 +116,9 @@ function setup(options: SetupOptions = {}) {
     async listOrders(_userId: string): Promise<Order[]> {
       return options.listResult ?? [];
     },
+    async listAllOrders(): Promise<Order[]> {
+      return options.listAllResult ?? options.listResult ?? [];
+    },
     async getOrderWithItems(_orderId: string): Promise<OrderWithItems | null> {
       return options.orderRecord ?? null;
     },
@@ -158,6 +162,7 @@ function setup(options: SetupOptions = {}) {
     OrderService,
     | "createOrder"
     | "listOrders"
+    | "listAllOrders"
     | "getOrderWithItems"
     | "cancelOrderIfEligible"
     | "getOrderById"
@@ -373,6 +378,17 @@ describe("OrderController.listOrders", () => {
   });
 });
 
+describe("OrderController.listAllOrders", () => {
+  test("returns all orders for admin dashboard", async () => {
+    const orders = [makeOrder(), makeOrder({ id: "order-2", userId: "other-user" })];
+    const { controller } = setup({ listAllResult: orders });
+
+    const result = await controller.listAllOrders();
+
+    expect(result).toEqual({ orders });
+  });
+});
+
 describe("OrderController.getOrder", () => {
   test("returns the order and its items when owned by the caller", async () => {
     const record = makeRecord();
@@ -399,6 +415,28 @@ describe("OrderController.getOrder", () => {
     const captured: CapturedReply = {};
 
     await controller.getOrder(fakeRequest(undefined, { id: "order-1" }), fakeReply(captured));
+
+    expect(captured.statusCode).toBe(HTTP_STATUS.NOT_FOUND);
+  });
+});
+
+describe("OrderController.getAdminOrder", () => {
+  test("returns any order with line items for admin", async () => {
+    const record = makeRecord({ userId: "other-patron" });
+    const { controller } = setup({ orderRecord: record });
+    const captured: CapturedReply = {};
+
+    await controller.getAdminOrder(fakeRequest(undefined, { id: "order-1" }, "admin"), fakeReply(captured));
+
+    expect(captured.statusCode).toBe(HTTP_STATUS.OK);
+    expect(captured.payload).toEqual({ order: record.order, items: record.items });
+  });
+
+  test("returns 404 when the order does not exist", async () => {
+    const { controller } = setup({ orderRecord: null });
+    const captured: CapturedReply = {};
+
+    await controller.getAdminOrder(fakeRequest(undefined, { id: "missing" }, "admin"), fakeReply(captured));
 
     expect(captured.statusCode).toBe(HTTP_STATUS.NOT_FOUND);
   });

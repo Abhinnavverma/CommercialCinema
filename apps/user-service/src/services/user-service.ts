@@ -48,10 +48,23 @@ export class UserService {
 }
 
 function isUniqueViolation(error: unknown): boolean {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    (error as { code: string }).code === PG_ERROR_CODES.UNIQUE_VIOLATION
-  );
+  if (typeof error !== "object" || error === null) {
+    return false;
+  }
+
+  const candidates: unknown[] = [error, (error as { cause?: unknown }).cause];
+  for (const candidate of candidates) {
+    if (
+      typeof candidate === "object" &&
+      candidate !== null &&
+      "code" in candidate &&
+      (candidate as { code: string }).code === PG_ERROR_CODES.UNIQUE_VIOLATION
+    ) {
+      return true;
+    }
+  }
+
+  // Drizzle wraps Postgres errors; fall back to message inspection.
+  const message = error instanceof Error ? error.message : String(error);
+  return message.includes("unique constraint") || message.includes("duplicate key");
 }

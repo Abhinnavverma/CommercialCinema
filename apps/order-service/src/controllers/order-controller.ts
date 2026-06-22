@@ -6,11 +6,14 @@ import type { OrderPlacedEvent, OrderStatusUpdatedEvent } from "@commerical-cine
 import type { StockClient } from "@commerical-cinema/rpc";
 import type { OrderService } from "../services/order-service.js";
 import type { PaymentGateway } from "../payment/mockStripe.js";
+import { chargeSimulationPayment } from "../payment/mockStripe.js";
 import {
   ADMIN_STATUS_TRANSITIONS,
   CANCELLABLE_STATUSES,
   ERROR_MESSAGES,
   ORDER_STATUS_CANCELLED,
+  SIMULATION_REQUEST_HEADER,
+  SIMULATION_REQUEST_VALUE,
   STOCK_DECREMENT_RESULT,
   type AdminTransitionFrom,
   type AdminTransitionTo,
@@ -23,6 +26,7 @@ type OrderControllerDeps = {
     OrderService,
     | "createOrder"
     | "listOrders"
+    | "listAllOrders"
     | "getOrderWithItems"
     | "cancelOrderIfEligible"
     | "updateOrderStatus"
@@ -44,6 +48,12 @@ type PlaceOrderBody = {
 };
 
 type Reservation = { itemId: string; quantity: number };
+
+function resolvePaymentGateway(request: FastifyRequest, fallback: PaymentGateway): PaymentGateway {
+  const header = request.headers?.[SIMULATION_REQUEST_HEADER];
+  const value = Array.isArray(header) ? header[0] : header;
+  return value === SIMULATION_REQUEST_VALUE ? chargeSimulationPayment : fallback;
+}
 
 function isValidItem(value: unknown): value is CartItem {
   if (!value || typeof value !== "object") {
@@ -124,14 +134,34 @@ export function createOrderController(deps: OrderControllerDeps) {
 
       // Step 2 - Charge. A clean decline releases the reservation and returns 402; a
       // thrown/timed-out gateway is a transient failure, released and surfaced as 500.
+      const paymentGateway = resolvePaymentGateway(request, charge);
+      const simulationHeader = request.headers?.[SIMULATION_REQUEST_HEADER];
+      const isSimulation =
+        (Array.isArray(simulationHeader) ? simulationHeader[0] : simulationHeader) ===
+        SIMULATION_REQUEST_VALUE;
       let payment;
       try {
-        payment = await charge(totalCents);
+        payment = await paymentGateway(totalCents);
       } catch (error) {
         log("Payment gateway error", error);
         await releaseAll(reserved);
         return reply.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).send({ error: ERROR_MESSAGES.PAYMENT_GATEWAY_ERROR });
       }
+
+      // #region agent log
+      fetch("http://127.0.0.1:7934/ingest/10281c98-45a9-4434-af44-66409e08ac63", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "466456" },
+        body: JSON.stringify({
+          sessionId: "466456",
+          hypothesisId: "A",
+          location: "order-controller.ts:placeOrder:payment",
+          message: "payment settled",
+          data: { isSimulation, success: payment.success, totalCents },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+      // #endregion
 
       if (!payment.success) {
         await releaseAll(reserved);
@@ -193,12 +223,28 @@ export function createOrderController(deps: OrderControllerDeps) {
       return { orders };
     },
 
+    async listAllOrders(): Promise<{ orders: Awaited<ReturnType<OrderService["listAllOrders"]>> }> {
+      const orders = await orderService.listAllOrders();
+      return { orders };
+    },
+
     async getOrder(request: FastifyRequest, reply: FastifyReply): Promise<void> {
       const { id } = request.params as { id: string };
       const result = await orderService.getOrderWithItems(id);
 
       // 404 (not 403) for a foreign order so we don't leak the existence of others' ids.
       if (!result || result.order.userId !== request.user.sub) {
+        return reply.status(HTTP_STATUS.NOT_FOUND).send({ error: ERROR_MESSAGES.ORDER_NOT_FOUND });
+      }
+
+      return reply.status(HTTP_STATUS.OK).send({ order: result.order, items: result.items });
+    },
+
+    async getAdminOrder(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+      const { id } = request.params as { id: string };
+      const result = await orderService.getOrderWithItems(id);
+
+      if (!result) {
         return reply.status(HTTP_STATUS.NOT_FOUND).send({ error: ERROR_MESSAGES.ORDER_NOT_FOUND });
       }
 

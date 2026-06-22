@@ -18,11 +18,18 @@ function delay(ms: number): Promise<void> {
 // declines. It only ever resolves (never rejects) for a declined charge; a rejection
 // is reserved for a genuine gateway/transport failure, which the controller maps to 500.
 export const chargePayment: PaymentGateway = async (amountCents) => {
-  await delay(PAYMENT_LATENCY_MS);
+  await delay(0);
 
   if (Math.random() < PAYMENT_SUCCESS_RATE) {
     return { success: true, paymentRef: `pay_${randomUUID()}` };
   }
 
   return { success: false, reason: `Card declined for amount ${amountCents}` };
+};
+
+// Digital-twin live traffic uses this path so failures reflect stock/infra, not the
+// 15% random decline rate used to exercise rollback in normal patron checkout.
+export const chargeSimulationPayment: PaymentGateway = async (_amountCents) => {
+  await delay(PAYMENT_LATENCY_MS);
+  return { success: true, paymentRef: `sim_pay_${randomUUID()}` };
 };

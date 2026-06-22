@@ -146,4 +146,12 @@ describe.skipIf(!reachable)("StockService atomic decrement (real Redis)", () => 
     expect(stock.get(known)).toBe(42);
     expect([...stock.values()].some((v) => v === 0)).toBe(true);
   });
+
+  test("setStock sets an absolute quantity", async () => {
+    const itemId = `test-setstock-${Date.now()}`;
+    const remaining = await service.setStock(itemId, 77);
+
+    expect(remaining).toBe(77);
+    expect(await redis.get(buildStockKey(itemId))).toBe("77");
+  });
 });

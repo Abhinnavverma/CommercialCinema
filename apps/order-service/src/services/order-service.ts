@@ -72,6 +72,11 @@ export class OrderService {
       .orderBy(desc(orders.createdAt));
   }
 
+  // Admin dashboard: every order across patrons, newest first.
+  async listAllOrders(): Promise<Order[]> {
+    return this.db.select().from(orders).orderBy(desc(orders.createdAt));
+  }
+
   // Order header plus its line items, or null when the id is unknown. Ownership is
   // enforced by the controller so it can distinguish 404 from a foreign order.
   async getOrderWithItems(orderId: string): Promise<OrderWithItems | null> {
