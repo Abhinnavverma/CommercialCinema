@@ -148,20 +148,6 @@ export function createOrderController(deps: OrderControllerDeps) {
         return reply.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).send({ error: ERROR_MESSAGES.PAYMENT_GATEWAY_ERROR });
       }
 
-      // #region agent log
-      fetch("http://127.0.0.1:7934/ingest/10281c98-45a9-4434-af44-66409e08ac63", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "466456" },
-        body: JSON.stringify({
-          sessionId: "466456",
-          hypothesisId: "A",
-          location: "order-controller.ts:placeOrder:payment",
-          message: "payment settled",
-          data: { isSimulation, success: payment.success, totalCents },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {});
-      // #endregion
 
       if (!payment.success) {
         await releaseAll(reserved);
